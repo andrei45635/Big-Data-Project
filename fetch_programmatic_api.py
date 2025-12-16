@@ -12,7 +12,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # TODO set tokens in env file
-WAQI_TOKEN = "token"
+WAQI_TOKEN = "insert-aqi-api-token-here"
 OPENWEATHER_KEY = "your_openweather_key"
 WAQI_BASE = "https://api.waqi.info"
 OWM_BASE = "https://api.openweathermap.org/data/2.5"
@@ -99,9 +99,9 @@ def fetch_and_publish():
                         }
 
                         # producer.send('air-quality-realtime', combined_data)
-                        # producer.send('air-quality-historical', combined_data)
+                        producer.send('air-quality-historical', combined_data)
 
-                        producer.send('test-topic', combined_data)
+                        # producer.send('test-topic', combined_data)
 
                         logger.info(
                             f"Published: {details['city']['name']} - "
