@@ -43,7 +43,8 @@ df = (spark
       .format("kafka")
       .option("kafka.bootstrap.servers", "172.17.0.1:9092")
       .option("subscribe", "air-quality-historical")
-      .option("startingOffsets", "earliest")
+      .option("startingOffsets", "latest")
+      .option("failOnDataLoss", "false")  # Added this line
       .load())
 
 parsed_df = df.select(
