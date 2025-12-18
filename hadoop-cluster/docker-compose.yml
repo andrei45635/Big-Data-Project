@@ -105,6 +105,21 @@ services:
     networks:
       - energy-network
 
+  grafana:
+    image: grafana/grafana-enterprise
+    container_name: grafana
+    restart: unless-stopped
+    environment:
+      - GF_SERVER_ROOT_URL=http://my.grafana.server/
+      - GF_PLUGINS_PREINSTALL=yesoreyeram-infinity-datasource
+    ports:
+      - '3000:3000'
+    volumes:
+      - 'grafana_storage:/var/lib/grafana'
+    networks:
+      - energy-network
+
+
 networks:
   energy-network:
     driver: bridge
@@ -115,3 +130,4 @@ volumes:
   datanode2-data:
   datanode3-data:
   spark-ivy-cache:
+  grafana_storage:
