@@ -12,7 +12,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # TODO set tokens in env file
-WAQI_TOKEN = "45627b5dc6719370cf644e51871c1532b65bedb2"
+WAQI_TOKEN = "token"
 OPENWEATHER_KEY = "your_openweather_key"
 WAQI_BASE = "https://api.waqi.info"
 OWM_BASE = "https://api.openweathermap.org/data/2.5"
