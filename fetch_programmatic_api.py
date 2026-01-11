@@ -8,12 +8,12 @@ import requests
 
 from kafka import KafkaProducer
 
+# create api_keys.py and define WAQI_TOKEN manually inside it
+from api_keys import WAQI_TOKEN, OPENWEATHER_KEY
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# TODO set tokens in env file
-WAQI_TOKEN = "token"
-OPENWEATHER_KEY = "your_openweather_key"
 WAQI_BASE = "https://api.waqi.info"
 OWM_BASE = "https://api.openweathermap.org/data/2.5"
 
