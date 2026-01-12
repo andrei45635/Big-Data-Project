@@ -98,10 +98,8 @@ def fetch_and_publish():
                             'forecast': details.get('forecast', {}),
                         }
 
-                        # producer.send('air-quality-realtime', combined_data)
+                        producer.send('air-quality-realtime', combined_data)
                         producer.send('air-quality-historical', combined_data)
-
-                        # producer.send('test-topic', combined_data)
 
                         logger.info(
                             f"Published: {details['city']['name']} - "

@@ -12,38 +12,38 @@ PROJECT_DIR="/mnt/c/users/gigabyte/onedrive/desktop/master/semestrul 3/big data/
 PYTHON_SCRIPT="fetch_programmatic_api.py"
 
 # 1. Stop Python API Fetcher
-echo -e "${YELLOW}[1/5] Stopping Python API fetcher...${NC}"
+echo -e "${YELLOW}[1/6] Stopping Python API fetcher...${NC}"
 pkill -f "$PYTHON_SCRIPT"
 echo -e "${GREEN}✓ Python API fetcher stopped${NC}"
 
-# 2. Stop Spark Streaming Job
-echo -e "\n${YELLOW}[2/5] Stopping Spark Streaming job...${NC}"
+# 2. Stop Spark Streaming Jobs
+echo -e "\n${YELLOW}[2/6] Stopping Spark Streaming jobs...${NC}"
 sudo docker exec spark-master pkill -f "kafka_to_hdfs.py" 2>/dev/null
-echo -e "${GREEN}✓ Spark Streaming job stopped${NC}"
+sudo docker exec spark-master pkill -f "kafka_to_cassandra.py" 2>/dev/null
+echo -e "${GREEN}✓ Spark Streaming jobs stopped${NC}"
 
-# 3. Stop MongoDB sync job (if running)
-echo -e "\n${YELLOW}[3/5] Stopping MongoDB sync job...${NC}"
+# 3. Stop sync jobs (if running)
+echo -e "\n${YELLOW}[3/6] Stopping sync jobs...${NC}"
 pkill -f "sync_to_mongodb.sh" 2>/dev/null
-sudo docker exec spark-master pkill -f "hdfs_to_mongodb.py" 2>/dev/null
-echo -e "${GREEN}✓ MongoDB sync job stopped${NC}"
-
-# 3a. Stop PostgreSQL sync job (if running)
-echo -e "\n${YELLOW}[3/5] Stopping PostgreSQL sync job...${NC}"
 pkill -f "sync_to_postgres.sh" 2>/dev/null
+sudo docker exec spark-master pkill -f "hdfs_to_mongodb.py" 2>/dev/null
 sudo docker exec spark-master pkill -f "hdfs_to_postgres.py" 2>/dev/null
-echo -e "${GREEN}✓ PostgreSQL sync job stopped${NC}"
+echo -e "${GREEN}✓ Sync jobs stopped${NC}"
 
 # 4. Stop Kafka
-echo -e "\n${YELLOW}[4/5] Stopping Kafka...${NC}"
+echo -e "\n${YELLOW}[4/6] Stopping Kafka...${NC}"
 pkill -f "kafka.Kafka"
 sleep 3
 echo -e "${GREEN}✓ Kafka stopped${NC}"
 
 # 5. Stop Docker Containers
-echo -e "\n${YELLOW}[5/5] Stopping Docker containers...${NC}"
+echo -e "\n${YELLOW}[5/6] Stopping Docker containers...${NC}"
 cd "$PROJECT_DIR/hadoop-cluster"
 sudo docker-compose down
 echo -e "${GREEN}✓ Docker containers stopped${NC}"
 
 echo -e "\n${GREEN}=== Pipeline Stopped ===${NC}"
-echo -e "${YELLOW}Note: Data in HDFS and MongoDB is preserved in Docker volumes${NC}"
+echo -e "${YELLOW}Note: Data is preserved in Docker volumes:${NC}"
+echo -e "  - HDFS (Batch Layer)"
+echo -e "  - PostgreSQL (Serving Layer)"
+echo -e "  - Cassandra (Speed Layer)"

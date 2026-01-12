@@ -1,39 +1,43 @@
-# Air Quality Prediction System - Big Data Project
+# Air Quality Monitoring System - Big Data Project
 
-A real-time air quality monitoring and prediction system built using Lambda Architecture with Kafka, Hadoop, Spark, PostgreSQL, and Grafana.
+A real-time air quality monitoring system built using **Lambda Architecture** with Kafka, Hadoop, Spark, Cassandra, PostgreSQL, and Grafana.
 
 ## 🎯 Project Overview
 
 This project implements an end-to-end big data pipeline that:
 - Fetches real-time air quality data from multiple cities worldwide
-- Processes data using both batch and stream processing (Lambda Architecture)
-- Stores historical data in HDFS for analytics and future ML model training
+- Implements true **Lambda Architecture** with batch and speed layers
+- Stores historical data in HDFS for long-term analytics
+- Processes real-time data with time-windowed aggregations in Cassandra
 - Provides queryable data in PostgreSQL for visualization
-- Visualizes real-time air quality metrics in Grafana dashboards
+- Visualizes air quality metrics in Grafana dashboards
 
-## 🏗️ Architecture
+## 🏗️ Lambda Architecture
 ```
-API Sources (WAQI) 
-    ↓
-Python Data Fetcher
-    ↓
-Apache Kafka (Message Queue)
-    ↓
-Spark Streaming → HDFS (Batch Layer - Historical Data Archive)
-    ↓
-Spark Batch Job (every 10 min) → PostgreSQL (Queryable Data)
-    ↓
-Grafana (Visualization & Dashboards)
+                    ┌─→ Spark Streaming → HDFS (Batch Layer)
+                    │                      ↓
+API → Kafka → Kafka ─┤                  Spark Batch → PostgreSQL (Serving Layer)
+                    │                                      ↓
+                    └─→ Spark Streaming → Cassandra (Speed Layer - Time Windows)
+                                           ↓
+                                        Grafana (Visualization)
 ```
+
+### Architecture Layers:
+
+1. **Batch Layer**: Historical data in HDFS → PostgreSQL for analytics
+2. **Speed Layer**: Real-time aggregations in Cassandra (1-hour windows)
+3. **Serving Layer**: PostgreSQL + Cassandra → Grafana dashboards
 
 ## 🛠️ Technology Stack
 
 | Component | Technology | Purpose |
 |-----------|-----------|---------|
-| Data Ingestion | Apache Kafka (KRaft) | Real-time message streaming |
-| Batch Processing | Apache Spark + Hadoop HDFS | Historical data storage & processing |
-| Stream Processing | Spark Streaming | Real-time data processing |
-| Database | PostgreSQL 15 | Queryable data for visualization |
+| Data Ingestion | Apache Kafka 4.1.1 (KRaft) | Real-time message streaming |
+| Batch Processing | Apache Spark 3.5.3 + Hadoop HDFS | Historical data storage & processing |
+| Stream Processing | Spark Structured Streaming | Real-time data processing |
+| Speed Layer DB | Apache Cassandra 4.1 | Time-series aggregations |
+| Serving Layer DB | PostgreSQL 15 | Queryable data for visualization |
 | Big Data Storage | Hadoop HDFS | Historical data archive (Parquet) |
 | Visualization | Grafana | Interactive dashboards |
 | Orchestration | Docker Compose | Container management |
@@ -44,9 +48,9 @@ Grafana (Visualization & Dashboards)
 - **WSL2** (Ubuntu) on Windows
 - **Docker Desktop** with WSL2 backend enabled
 - **Python 3.8+**
-- **Apache Kafka** (running on WSL2 in KRaft mode)
+- **Apache Kafka 4.1.1** (running on WSL2 in KRaft mode)
 - **Java 11+** (for Kafka)
-- **8GB+ RAM** recommended
+- **8GB+ RAM** recommended (10GB+ for Cassandra)
 
 ## 🚀 Installation
 
@@ -67,11 +71,11 @@ pip install confluent-kafka requests
 sudo apt update
 sudo apt install openjdk-11-jdk -y
 
-# Download and extract Kafka
+# Download and extract Kafka 4.1.1
 cd ~
-wget https://downloads.apache.org/kafka/3.6.1/kafka_2.13-3.6.1.tgz
-tar -xzf kafka_2.13-3.6.1.tgz
-cd kafka_2.13-3.6.1
+wget https://downloads.apache.org/kafka/4.1.1/kafka_2.13-4.1.1.tgz
+tar -xzf kafka_2.13-4.1.1.tgz
+cd kafka_2.13-4.1.1
 
 # Set Java Home
 export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
@@ -81,7 +85,7 @@ source ~/.bashrc
 
 ### 4. Configure Kafka for Docker Integration
 
-Edit `~/kafka_*/config/server.properties`:
+Edit `~/kafka_2.13-4.1.1/config/server.properties`:
 ```properties
 # KRaft mode configuration
 process.roles=broker,controller
@@ -90,16 +94,19 @@ controller.quorum.voters=1@localhost:9093
 
 # Network configuration for Docker
 listeners=PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
-advertised.listeners=PLAINTEXT://172.17.0.1:9092,CONTROLLER://localhost:9093
+advertised.listeners=PLAINTEXT://172.17.0.1:9092
 controller.listener.names=CONTROLLER
+listener.security.protocol.map=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+
+# Storage
 log.dirs=/tmp/kraft-combined-logs
 ```
 
 Initialize Kafka storage:
 ```bash
-cd ~/kafka_*
+cd ~/kafka_2.13-4.1.1
 KAFKA_CLUSTER_ID="$(bin/kafka-storage.sh random-uuid)"
-bin/kafka-storage.sh format -t $KAFKA_CLUSTER_ID -c config/server.properties --standalone
+bin/kafka-storage.sh format -t $KAFKA_CLUSTER_ID -c config/server.properties
 ```
 
 ### 5. Set Up Project Structure
@@ -112,74 +119,62 @@ Your project structure should look like:
 Big-Data-Project/
 ├── docker-compose.yml
 ├── fetch_programmatic_api.py
+├── api_keys.py                    # Create this with your API tokens
 ├── spark-apps/
 │   ├── kafka_to_hdfs.py
-│   ├── hdfs_to_mongodb.py
-│   └── hdfs_to_postgres.py
-├── data/
+│   ├── kafka_to_cassandra.py
+│   ├── hdfs_to_postgres.py
+│   └── hdfs_to_mongodb.py         # Optional
 ├── start_pipeline.sh
 ├── stop_pipeline.sh
 ├── status_pipeline.sh
 ├── sync_to_postgres.sh
+├── setup_cassandra.sh
+├── check_cassandra.sh
 └── README.md
 ```
 
-### 6. Configure API Token
+### 6. Configure API Tokens
 
-Edit `fetch_programmatic_api.py` and add your WAQI API token:
+Create `api_keys.py`:
 ```python
 WAQI_TOKEN = "your_token_here"  # Get from https://aqicn.org/data-platform/token/
+OPENWEATHER_KEY = "your_key_here"  # Optional
 ```
 
 ## 🎬 Quick Start
 
-### Option 1: Using Shell Scripts (Recommended)
+### One-Time Setup
 ```bash
 # Make scripts executable
-chmod +x start_pipeline.sh stop_pipeline.sh status_pipeline.sh sync_to_postgres.sh
+chmod +x *.sh
 
+# Start Docker services
+sudo docker-compose up -d
+
+# Wait for Cassandra to start (takes 1-2 minutes)
+sleep 120
+
+# Setup Cassandra schema
+./setup_cassandra.sh
+```
+
+### Regular Usage
+```bash
 # Start the entire pipeline
 ./start_pipeline.sh
 
 # Check pipeline status
 ./status_pipeline.sh
 
-# Sync HDFS data to PostgreSQL (for Grafana)
+# Check Cassandra speed layer
+./check_cassandra.sh
+
+# Sync HDFS to PostgreSQL (for Grafana)
 ./sync_to_postgres.sh
 
 # Stop the pipeline
 ./stop_pipeline.sh
-```
-
-### Option 2: Manual Start
-
-**Terminal 1: Start Docker Services**
-```bash
-sudo docker-compose up -d
-```
-
-**Terminal 2: Start Kafka**
-```bash
-cd ~/kafka_*
-bin/kafka-server-start.sh config/server.properties
-```
-
-**Terminal 3: Start Spark Streaming Job**
-```bash
-sudo docker exec -u root -it spark-master /opt/spark/bin/spark-submit \
-    --master spark://spark-master:7077 \
-    --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.3 \
-    /opt/spark-apps/kafka_to_hdfs.py
-```
-
-**Terminal 4: Start API Fetcher**
-```bash
-python3 fetch_programmatic_api.py
-```
-
-**Terminal 5: Sync to PostgreSQL (when ready)**
-```bash
-./sync_to_postgres.sh
 ```
 
 ## 📊 Monitoring & Verification
@@ -193,7 +188,7 @@ python3 fetch_programmatic_api.py
 
 ### Command Line Checks
 
-**Check HDFS Data:**
+**Check HDFS Data (Batch Layer):**
 ```bash
 # List directories
 sudo docker exec -it namenode hdfs dfs -ls /air-quality/historical/
@@ -201,26 +196,53 @@ sudo docker exec -it namenode hdfs dfs -ls /air-quality/historical/
 # Check data size
 sudo docker exec -it namenode hdfs dfs -du -h /air-quality/historical/
 
-# List files recursively
-sudo docker exec -it namenode hdfs dfs -ls -R /air-quality/historical/
+# List files by city
+sudo docker exec -it namenode hdfs dfs -ls /air-quality/historical/city_name=Bucharest/
 ```
 
-**Check Kafka Messages:**
+**Check Kafka Topics:**
 ```bash
-cd ~/kafka_*
+cd ~/kafka_2.13-4.1.1
 
 # List topics
 bin/kafka-topics.sh --list --bootstrap-server localhost:9092
 
-# Consume messages
+# Check message count
+bin/kafka-get-offsets.sh --bootstrap-server localhost:9092 --topic air-quality-historical
+bin/kafka-get-offsets.sh --bootstrap-server localhost:9092 --topic air-quality-realtime
+
+# Consume sample messages
 bin/kafka-console-consumer.sh \
     --bootstrap-server localhost:9092 \
     --topic air-quality-historical \
     --from-beginning \
-    --max-messages 5
+    --max-messages 1
 ```
 
-**Check PostgreSQL Data:**
+**Check Cassandra Data (Speed Layer):**
+```bash
+# Quick status
+./check_cassandra.sh
+
+# Detailed view
+./check_cassandra.sh --detailed
+
+# Manual queries
+sudo docker exec -it cassandra cqlsh
+
+USE air_quality;
+
+-- Latest readings
+SELECT * FROM latest_readings WHERE city_name = 'Bucharest' LIMIT 5;
+
+-- Hourly aggregations
+SELECT * FROM hourly_metrics WHERE city_name = 'Bucharest' LIMIT 5;
+
+-- Exit
+exit
+```
+
+**Check PostgreSQL Data (Serving Layer):**
 ```bash
 # Connect to PostgreSQL
 sudo docker exec -it postgres psql -U postgres -d air_quality
@@ -229,10 +251,15 @@ sudo docker exec -it postgres psql -U postgres -d air_quality
 SELECT COUNT(*) FROM air_quality_data;
 
 # View records by city
-SELECT city_name, COUNT(*), AVG(aqi) FROM air_quality_data GROUP BY city_name;
+SELECT city_name, COUNT(*), ROUND(AVG(aqi)) as avg_aqi 
+FROM air_quality_data 
+GROUP BY city_name;
 
 # View recent data
-SELECT timestamp, city_name, station_name, aqi, pm25 FROM air_quality_data ORDER BY timestamp DESC LIMIT 10;
+SELECT timestamp, city_name, station_name, aqi, pm25 
+FROM air_quality_data 
+ORDER BY timestamp DESC 
+LIMIT 10;
 
 # Exit
 \q
@@ -240,24 +267,23 @@ SELECT timestamp, city_name, station_name, aqi, pm25 FROM air_quality_data ORDER
 
 **Read HDFS Data with Spark:**
 ```bash
-# Enter Spark container
+# Enter PySpark shell
 sudo docker exec -it spark-master /opt/spark/bin/pyspark
 
-# Inside PySpark:
+# Read and analyze
 >>> df = spark.read.parquet("hdfs://namenode:9000/air-quality/historical/")
 >>> df.show()
 >>> df.count()
->>> df.printSchema()
->>> df.filter("city_name = 'Bucharest'").show()
 >>> df.groupBy("city_name").count().show()
+>>> df.filter("city_name = 'Bucharest'").select("aqi", "pm25", "timestamp").show(10)
 ```
 
 ## 📁 Data Schema
 
-### Air Quality Data Structure (HDFS - Parquet)
+### Kafka Message Format
 ```json
 {
-  "fetch_timestamp": "2024-12-18T10:30:00",
+  "fetch_timestamp": "2026-01-12T10:30:00",
   "city_name": "Bucharest",
   "idx": 8268,
   "aqi": 85,
@@ -265,13 +291,14 @@ sudo docker exec -it spark-master /opt/spark/bin/pyspark
   "city": {
     "name": "Bucharest Berceni",
     "geo": [44.3947, 26.1128],
-    "url": "https://aqicn.org/city/bucharest/berceni"
+    "url": "https://aqicn.org/city/bucharest/berceni",
+    "location": "Sector 4, Bucharest, Romania"
   },
   "time": {
-    "s": "2024-12-18 10:00:00",
+    "s": "2026-01-12 10:00:00",
     "tz": "+02:00",
-    "v": 1702728000,
-    "iso": "2024-12-18T10:00:00+02:00"
+    "v": 1736673600,
+    "iso": "2026-01-12T08:00:00Z"
   },
   "iaqi": {
     "pm25": {"v": 65},
@@ -285,6 +312,7 @@ sudo docker exec -it spark-master /opt/spark/bin/pyspark
     "p": {"v": 1013},
     "w": {"v": 12}
   },
+  "attributions": [...],
   "forecast": {
     "daily": {
       "pm25": [...],
@@ -295,7 +323,43 @@ sudo docker exec -it spark-master /opt/spark/bin/pyspark
 }
 ```
 
-### PostgreSQL Table Schema
+### Cassandra Schema (Speed Layer)
+```sql
+-- Keyspace
+CREATE KEYSPACE air_quality
+WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};
+
+-- Latest readings (real-time data)
+CREATE TABLE latest_readings (
+    city_name text,
+    station_name text,
+    timestamp timestamp,
+    aqi int,
+    pm25 double,
+    pm10 double,
+    temperature double,
+    humidity double,
+    PRIMARY KEY ((city_name), timestamp, station_name)
+) WITH CLUSTERING ORDER BY (timestamp DESC);
+
+-- Hourly aggregations (1-hour time windows)
+CREATE TABLE hourly_metrics (
+    city_name text,
+    window_start timestamp,
+    window_end timestamp,
+    avg_aqi double,
+    max_aqi int,
+    min_aqi int,
+    avg_pm25 double,
+    avg_pm10 double,
+    avg_temperature double,
+    avg_humidity double,
+    record_count int,
+    PRIMARY KEY ((city_name), window_start)
+) WITH CLUSTERING ORDER BY (window_start DESC);
+```
+
+### PostgreSQL Schema (Serving Layer)
 ```sql
 CREATE TABLE air_quality_data (
     fetch_timestamp VARCHAR,
@@ -333,7 +397,7 @@ Cities can be added/modified in `fetch_programmatic_api.py`
 
 ## 📈 Grafana Dashboard Setup
 
-### 1. Configure PostgreSQL Data Source
+### 1. Configure PostgreSQL Data Source (Batch Layer)
 
 1. Open http://localhost:3000 (login: admin/admin)
 2. Go to **Configuration** → **Data Sources** → **Add data source**
@@ -346,10 +410,25 @@ Cities can be added/modified in `fetch_programmatic_api.py`
    - **TLS/SSL Mode**: `disable`
 5. Click **Save & Test**
 
-### 2. Example Dashboard Queries
+### 2. Configure Cassandra Data Source (Speed Layer)
+```bash
+# Install Cassandra plugin
+sudo docker exec -u root grafana grafana-cli plugins install hadesarchitect-cassandra-datasource
+sudo docker restart grafana
+```
 
-**Average AQI by City Over Time:**
+Then in Grafana:
+1. Add **Cassandra** data source
+2. Configure:
+   - **Host**: `cassandra:9042`
+   - **Keyspace**: `air_quality`
+3. Click **Save & Test**
+
+### 3. Example Dashboard Queries
+
+**PostgreSQL - Historical Trends:**
 ```sql
+-- Average AQI by City Over Time
 SELECT
   timestamp AS "time",
   city_name,
@@ -357,211 +436,209 @@ SELECT
 FROM air_quality_data
 WHERE $__timeFilter(timestamp)
 GROUP BY timestamp, city_name
-ORDER BY timestamp
-```
+ORDER BY timestamp;
 
-**Latest AQI by City:**
-```sql
+-- Latest Readings by City
 SELECT DISTINCT ON (city_name)
   city_name as "City",
   aqi as "AQI",
-  station_name as "Station",
-  pm25 as "PM2.5"
-FROM air_quality_data
-ORDER BY city_name, timestamp DESC
-```
-
-**PM2.5 Trends:**
-```sql
-SELECT
-  timestamp AS "time",
-  city_name,
-  AVG(pm25) as pm25
-FROM air_quality_data
-WHERE $__timeFilter(timestamp) AND pm25 IS NOT NULL
-GROUP BY timestamp, city_name
-ORDER BY timestamp
-```
-
-**All Stations with Latest Data:**
-```sql
-SELECT DISTINCT ON (station_name)
-  station_name as "Station",
-  city_name as "City",
-  aqi as "AQI",
   pm25 as "PM2.5",
-  pm10 as "PM10",
-  temperature as "Temp (°C)",
-  humidity as "Humidity (%)",
-  timestamp
+  station_name as "Station"
 FROM air_quality_data
-ORDER BY station_name, timestamp DESC
+ORDER BY city_name, timestamp DESC;
 ```
 
-### 3. Recommended Panel Types
+**Cassandra - Real-time Windows:**
+```sql
+-- Hourly AQI Trends
+SELECT window_start, city_name, avg_aqi, max_aqi
+FROM hourly_metrics 
+WHERE city_name IN ('Bucharest', 'Beijing', 'London');
 
-- **Time Series**: AQI trends, pollutant levels over time
-- **Stat**: Current AQI values, latest measurements
+-- Latest Real-time Readings
+SELECT timestamp, city_name, station_name, aqi, pm25
+FROM latest_readings 
+WHERE city_name = 'Bucharest' 
+LIMIT 20;
+```
+
+### 4. Recommended Panel Types
+
+- **Time Series**: AQI trends (use PostgreSQL for long history, Cassandra for recent)
+- **Stat**: Current AQI values from Cassandra latest_readings
 - **Gauge**: AQI with color thresholds (0-50 green, 50-100 yellow, 100+ red)
-- **Table**: All stations with detailed metrics
-- **Bar Chart**: City comparisons
-- **Pie Chart**: Pollutant distribution
+- **Table**: All stations with latest metrics
+- **Bar Chart**: City comparisons from hourly_metrics
+- **Heatmap**: PM2.5 levels by hour
 
 ## 🔧 Configuration
 
 ### Kafka Topics
 
-- `air-quality-historical` - For batch processing (HDFS)
-- `air-quality-realtime` - For real-time stream processing
+- `air-quality-historical` - Batch layer (HDFS)
+- `air-quality-realtime` - Speed layer (Cassandra)
 
 **Topic Configuration:**
-- Partitions: 3
+- Partitions: 1 (can be increased for higher throughput)
 - Replication Factor: 1
 - Retention: 7 days (default)
 
-### Data Collection Frequency
+### Data Flow Frequencies
 
-- **API polling**: Every 5 minutes
-- **Spark streaming**: Continuous (micro-batches every 5 minutes)
-- **HDFS → PostgreSQL sync**: Manual or scheduled (every 10 minutes)
+- **API polling**: Every 5 minutes (~150-200 stations per cycle)
+- **Kafka throughput**: Real-time (sub-second)
+- **Spark Streaming**: Continuous micro-batches (5-minute trigger)
+- **Cassandra writes**: Real-time (as data arrives)
+- **Cassandra time windows**: 1-hour aggregations
+- **HDFS → PostgreSQL sync**: Manual or every 10 minutes
 
-### Storage Details
+### Storage Configuration
 
 - **HDFS**: Parquet format, Snappy compression, partitioned by `city_name`
-- **PostgreSQL**: Relational table with indexes on `timestamp`, `city_name`, and `aqi`
-- **Data Retention**: 
-  - HDFS: Unlimited (configure manually if needed)
-  - PostgreSQL: Configurable (recommend keeping recent data only)
+- **Cassandra**: Time-series optimized, partition key on `city_name`
+- **PostgreSQL**: B-tree indexes on `timestamp`, `city_name`, `aqi`
+- **Data Retention**:
+  - HDFS: Unlimited (configure if needed)
+  - Cassandra: Configurable TTL (default: no expiration)
+  - PostgreSQL: Configurable (recommend 30-90 days)
 
 ## 🐛 Troubleshooting
 
 ### Kafka Connection Issues
 
 **Problem**: Spark can't connect to Kafka
-```
-WARN NetworkClient: Connection to node 1 could not be established
-ERROR ClientUtils: Couldn't resolve server host.docker.internal
-```
-
-**Solution**: Verify Kafka advertised listeners
 ```bash
-# Check config
-grep advertised.listeners ~/kafka_*/config/server.properties
+# Check Kafka configuration
+grep advertised.listeners ~/kafka_2.13-4.1.1/config/server.properties
 
-# Should be:
-advertised.listeners=PLAINTEXT://172.17.0.1:9092,CONTROLLER://localhost:9093
+# Should show:
+# advertised.listeners=PLAINTEXT://172.17.0.1:9092
+
+# Restart Kafka if needed
+pkill -f kafka.Kafka
+cd ~/kafka_2.13-4.1.1
+bin/kafka-server-start.sh config/server.properties
+```
+
+### Cassandra Not Starting
+
+**Problem**: Cassandra container keeps restarting
+```bash
+# Check logs
+sudo docker logs cassandra
+
+# If out of memory, limit resources in docker-compose.yml:
+cassandra:
+  environment:
+    - MAX_HEAP_SIZE=512M
+    - HEAP_NEWSIZE=128M
+  mem_limit: 2g
+```
+
+### Cassandra Tables Don't Exist
+
+**Problem**: Queries fail with "keyspace doesn't exist"
+```bash
+# Manually create schema
+./setup_cassandra.sh
+
+# Or connect and create manually
+sudo docker exec -it cassandra cqlsh
+# Then paste the CREATE TABLE commands
 ```
 
 ### Spark Streaming Job Crashes
 
-**Problem**: Checkpoint offset mismatch
-```
-ERROR: Partition air-quality-historical-0's offset was changed from 134 to 59
-```
-
-**Solution**: Clear checkpoint and restart
+**Problem**: Offset mismatch error
 ```bash
-# Delete checkpoint
-sudo docker exec -it namenode hdfs dfs -rm -r /checkpoints/historical
+# Clear checkpoint and restart
+sudo docker exec namenode hdfs dfs -rm -r /checkpoints/historical
+sudo docker exec namenode hdfs dfs -rm -r /checkpoints/cassandra-latest
+sudo docker exec namenode hdfs dfs -rm -r /checkpoints/cassandra-windows
 
-# Restart Spark job
-sudo docker exec -u root -it spark-master /opt/spark/bin/spark-submit \
-    --master spark://spark-master:7077 \
-    --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.3 \
-    /opt/spark-apps/kafka_to_hdfs.py
+# Restart Spark jobs
+./stop_pipeline.sh
+./start_pipeline.sh
 ```
 
-### HDFS Permission Errors
+### No Data in Cassandra
 
-**Problem**: Cannot write to HDFS
-```
-Permission denied: user=spark, access=WRITE
-```
-
-**Solution**: Run spark-submit as root
+**Problem**: Tables exist but no data
 ```bash
-sudo docker exec -u root -it spark-master /opt/spark/bin/spark-submit ...
+# Check if realtime topic has messages
+cd ~/kafka_2.13-4.1.1
+bin/kafka-get-offsets.sh --bootstrap-server localhost:9092 --topic air-quality-realtime
+
+# If 0 messages, API fetcher isn't sending to realtime topic
+# Edit fetch_programmatic_api.py and UNCOMMENT:
+# producer.send('air-quality-realtime', combined_data)
+
+# Restart API fetcher
+pkill -f fetch_programmatic_api.py
+python3 fetch_programmatic_api.py &
 ```
 
-### Docker Container Not Starting
+### Spark Job Waiting for Cores
 
-**Problem**: Container fails to start or exits immediately
-
-**Solution**: Check logs and restart
+**Problem**: Job stuck with 0 cores allocated
 ```bash
-# Check logs
-sudo docker logs <container-name>
+# Check how many jobs are running
+curl http://localhost:8081
 
-# Clean up and restart
-sudo docker-compose down
-sudo docker-compose up -d
-```
-
-### PostgreSQL Version Incompatibility
-
-**Problem**: PostgreSQL data format error after upgrade
-
-**Solution**: Remove old volume and use PostgreSQL 15
-```bash
-sudo docker-compose down
-sudo docker volume rm <project>_postgres-data
-# Update docker-compose.yml to use postgres:15
-sudo docker-compose up -d
-```
-
-### Python Package Issues
-
-**Problem**: `ModuleNotFoundError: No module named 'kafka'`
-
-**Solution**: Use confluent-kafka
-```bash
-pip uninstall kafka-python kafka-python-ng
-pip install confluent-kafka
-```
-
-### Spark Job Gets 0 Cores
-
-**Problem**: Spark job stuck waiting for resources
-
-**Solution**: Kill other running Spark jobs first
-```bash
-# Kill streaming job
+# Kill other jobs to free cores
 sudo docker exec spark-master pkill -f kafka_to_hdfs.py
 
-# Then run your job
-sudo docker exec -u root -it spark-master /opt/spark/bin/spark-submit ...
+# Or reduce core allocation in start_pipeline.sh:
+--total-executor-cores 4  # Instead of 8
 ```
 
 ## 📊 Performance Metrics
 
 ### Expected Throughput
 
-- API fetch rate: ~150-200 stations per cycle (every 5 minutes)
-- Kafka throughput: 1000+ messages/second (not fully utilized)
-- HDFS write rate: 10-50 MB per 5-minute cycle
-- PostgreSQL sync: ~750 records in ~30 seconds
-- Data retention: 
-  - HDFS: Unlimited
-  - PostgreSQL: Configurable
+- **API fetch rate**: ~150-200 stations per cycle (every 5 minutes)
+- **Kafka throughput**: 600+ messages per 5-minute cycle
+- **HDFS write rate**: 10-50 MB per cycle
+- **Cassandra writes**: Real-time (< 100ms latency)
+- **PostgreSQL sync**: ~750 records in ~30 seconds
+- **Time window processing**: 1-hour windows calculated in real-time
 
 ### Resource Usage
 
-- Docker containers: ~4-6 GB RAM total
-- Kafka (WSL2): ~500 MB RAM
-- Python fetcher: ~100 MB RAM
-- Total disk usage: ~500 MB - 1 GB per day (depends on data volume)
+- **Docker containers**: ~6-8 GB RAM (with Cassandra)
+- **Kafka (WSL2)**: ~500 MB RAM
+- **Python fetcher**: ~100 MB RAM
+- **Cassandra**: ~2 GB RAM
+- **Total disk**: ~1-2 GB per day
 
-### Data Volume (Example After 24 Hours)
+### Data Volume (After 24 Hours)
 
-- HDFS: ~350-400 KB (compressed Parquet)
-- PostgreSQL: ~750 records
-- Kafka: Transient (messages deleted after consumption)
+- **HDFS**: ~400-500 KB (compressed Parquet)
+- **Cassandra latest_readings**: ~600 records
+- **Cassandra hourly_metrics**: ~24 windows per city
+- **PostgreSQL**: ~750 records (after sync)
+- **Kafka**: Transient (messages deleted after consumption)
 
 ## 📚 Additional Resources
 
-- [Apache Kafka Documentation](https://kafka.apache.org/documentation/)
+- [Apache Kafka 4.1.1 Documentation](https://kafka.apache.org/documentation/)
 - [Apache Spark Structured Streaming](https://spark.apache.org/docs/latest/structured-streaming-programming-guide.html)
+- [Apache Cassandra 4.1 Documentation](https://cassandra.apache.org/doc/latest/)
 - [Hadoop HDFS Guide](https://hadoop.apache.org/docs/stable/hadoop-project-dist/hadoop-hdfs/HdfsUserGuide.html)
-- [PostgreSQL Documentation](https://www.postgresql.org/docs/15/)
+- [PostgreSQL 15 Documentation](https://www.postgresql.org/docs/15/)
 - [Grafana Documentation](https://grafana.com/docs/grafana/latest/)
+- [Lambda Architecture](http://lambda-architecture.net/)
 - [WAQI API Documentation](https://aqicn.org/json-api/doc/)
+
+## 📝 License
+
+This project is for academic purposes as part of a Big Data course at Babeș-Bolyai University.
+
+## 🙏 Acknowledgments
+
+- World Air Quality Index (WAQI) for providing the API
+- Apache Software Foundation for Kafka, Spark, Hadoop, and Cassandra
+- Docker community for containerization tools
+- Grafana Labs for visualization platform
+
+---

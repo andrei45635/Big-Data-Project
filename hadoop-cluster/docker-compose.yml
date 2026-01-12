@@ -115,6 +115,25 @@ services:
     networks:
       - air-quality-network
 
+  cassandra:
+    image: cassandra:4.1
+    container_name: cassandra
+    ports:
+      - "9042:9042"
+    environment:
+      - CASSANDRA_CLUSTER_NAME=AirQualityCluster
+      - CASSANDRA_DC=dc1
+      - CASSANDRA_ENDPOINT_SNITCH=GossipingPropertyFileSnitch
+    volumes:
+      - cassandra-data:/var/lib/cassandra
+    networks:
+      - air-quality-network
+    healthcheck:
+      test: [ "CMD-SHELL", "cqlsh -e 'describe cluster'" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
   postgres:
     image: postgres:17
     container_name: postgres
@@ -158,3 +177,4 @@ volumes:
   mongo-data:
   postgres-data:
   grafana-data:
+  cassandra-data:
