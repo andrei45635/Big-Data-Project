@@ -36,6 +36,11 @@ pkill -f "kafka.Kafka"
 sleep 3
 echo -e "${GREEN}✓ Kafka stopped${NC}"
 
+# 4.a Stop Cassandra (optional - saves resources)
+echo -e "\n${YELLOW}Stopping Cassandra...${NC}"
+sudo docker stop cassandra
+echo -e "${GREEN}✓ Cassandra stopped${NC}"
+
 # 5. Stop Docker Containers
 echo -e "\n${YELLOW}[5/6] Stopping Docker containers...${NC}"
 cd "$PROJECT_DIR/hadoop-cluster"

@@ -142,20 +142,30 @@ else
     exit 1
 fi
 
-# 6. Start Spark Streaming Job (Kafka → Cassandra) - Speed Layer
-echo -e "\n${YELLOW}[6/7] Starting Spark Streaming job (Kafka → Cassandra - Speed Layer)...${NC}"
-sudo docker exec -u root -d spark-master bash -c "nohup /opt/spark/bin/spark-submit \
-    --master spark://spark-master:7077 \
-    --total-executor-cores 8 \
-    --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.3,com.datastax.spark:spark-cassandra-connector_2.12:3.4.1 \
-    /opt/spark-apps/kafka_to_cassandra.py > /tmp/spark-cassandra.log 2>&1 &"
+## 6. Start Spark Streaming Job (Kafka → Cassandra) - Speed Layer
+#echo -e "\n${YELLOW}[6/7] Starting Spark Streaming job (Kafka → Cassandra - Speed Layer)...${NC}"
+#sudo docker exec -u root -d spark-master bash -c "nohup /opt/spark/bin/spark-submit \
+#    --master spark://spark-master:7077 \
+#    --total-executor-cores 8 \
+#    --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.3,com.datastax.spark:spark-cassandra-connector_2.12:3.4.1 \
+#    /opt/spark-apps/kafka_to_cassandra.py > /tmp/spark-cassandra.log 2>&1 &"
+#
+#if [ $? -eq 0 ]; then
+#    echo -e "${GREEN}✓ Spark Streaming job (Cassandra) submitted${NC}"
+#    wait_for_service "Cassandra job initialization" 10
+#else
+#    echo -e "${YELLOW}⚠ Cassandra job may not have started (check if kafka_to_cassandra.py exists)${NC}"
+#fi
 
-if [ $? -eq 0 ]; then
-    echo -e "${GREEN}✓ Spark Streaming job (Cassandra) submitted${NC}"
-    wait_for_service "Cassandra job initialization" 10
-else
-    echo -e "${YELLOW}⚠ Cassandra job may not have started (check if kafka_to_cassandra.py exists)${NC}"
-fi
+# 6. Start Spark Streaming Job (Kafka → Cassandra) - Speed Layer
+echo -e "\n${YELLOW}[6/7] Cassandra speed layer ready (start manually if needed)...${NC}"
+# sudo docker exec -u root -d spark-master bash -c "nohup /opt/spark/bin/spark-submit \
+#     --master spark://spark-master:7077 \
+#     --total-executor-cores 4 \
+#     --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.3,com.datastax.spark:spark-cassandra-connector_2.12:3.4.1 \
+#     /opt/spark-apps/kafka_to_cassandra.py > /tmp/spark-cassandra.log 2>&1 &"
+
+echo -e "${YELLOW}To start Cassandra speed layer manually: ./start_cassandra_job.sh${NC}"
 
 # 7. Start Python API Fetcher
 echo -e "\n${YELLOW}[7/7] Starting Python API fetcher...${NC}"
