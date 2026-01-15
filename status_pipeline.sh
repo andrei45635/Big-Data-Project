@@ -74,6 +74,33 @@ else
     echo -e "${YELLOW}⚠${NC}  No data in PostgreSQL yet (run ./sync_to_postgres.sh)"
 fi
 
+# ML Predictions
+echo -e "\n${BLUE}ML Predictions (PostgreSQL):${NC}"
+PRED_COUNT=$(sudo docker exec postgres psql -U postgres -d air_quality -t -c \
+    "SELECT COUNT(*) FROM aqi_predictions;" 2>/dev/null | tr -d ' ')
+
+if [ $? -eq 0 ] && [ -n "$PRED_COUNT" ] && [ "$PRED_COUNT" != "0" ]; then
+    echo -e "${GREEN}✓${NC} Total predictions: $PRED_COUNT"
+
+    echo -e "\n${BLUE}Predictions by City:${NC}"
+    sudo docker exec postgres psql -U postgres -d air_quality -t -c \
+        "SELECT city, COUNT(*) as count,
+                MIN(timestamp) as earliest,
+                MAX(timestamp) as latest
+         FROM aqi_predictions
+         GROUP BY city
+         ORDER BY city;" 2>/dev/null
+
+    echo -e "\n${BLUE}Latest Predictions:${NC}"
+    sudo docker exec postgres psql -U postgres -d air_quality -c \
+        "SELECT city, aqi, timestamp
+         FROM aqi_predictions
+         ORDER BY timestamp DESC
+         LIMIT 6;" 2>/dev/null
+else
+    echo -e "${YELLOW}⚠${NC}  No predictions yet (run ./run_ml_predictions.sh)"
+fi
+
 # Cassandra Data (Speed Layer)
 echo -e "\n${BLUE}Cassandra Storage (Speed Layer):${NC}"
 CASS_LATEST=$(sudo docker exec cassandra cqlsh -e "SELECT COUNT(*) FROM air_quality.latest_readings;" 2>/dev/null | grep -oE '[0-9]+' | tail -1)

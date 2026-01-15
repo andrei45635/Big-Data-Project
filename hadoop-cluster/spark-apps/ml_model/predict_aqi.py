@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import sys
+import os
 import pandas as pd
 import numpy as np
 import joblib
@@ -8,8 +9,11 @@ from tensorflow.keras.models import load_model
 # -------------------
 # CONFIG
 # -------------------
-MODEL_PATH = "aqi_model_lstm.keras"       # folder saved by model.save()
-SCALER_PATH = "scaler.save"         # MinMaxScaler saved with joblib
+print(os.getcwd(), file=sys.stderr)
+os.chdir("/opt/spark-apps/ml_model/")
+print(os.getcwd(), file=sys.stderr)
+MODEL_PATH = "aqi_model_lstm.keras"  # folder saved by model.save()
+SCALER_PATH = "scaler.save"  # MinMaxScaler saved with joblib
 FEATURE_COLS = [
     "aqi", "pm25", "pm10", "ozone", "no2", "so2", "co",
     "temperature", "humidity", "pressure", "wind_speed"
@@ -86,4 +90,4 @@ pred_aqi = scaler.inverse_transform(dummy)[:, target_index]
 # for i, val in enumerate(pred_aqi, 1):
 #     print(f"t+{i}: {val:.2f}")
 
-print(','.join([str(val) for _, val in enumerate(pred_aqi, 1)]))
+print(','.join([str(val) for _, val in enumerate(pred_aqi, 1)]), file=sys.stderr)

@@ -132,4 +132,4 @@ print(f"Predicted future AQI for city {city}:")
 print(future_aqi)
 
 model.save("aqi_model_lstm.keras")
-joblib.dump(scaler, "scaler.save")
+joblib.dump(scaler, "hadoop-cluster/spark-apps/ml_model/scaler.save")

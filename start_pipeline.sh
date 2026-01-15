@@ -167,7 +167,22 @@ echo -e "\n${YELLOW}[6/7] Cassandra speed layer ready (start manually if needed)
 
 echo -e "${YELLOW}To start Cassandra speed layer manually: ./start_cassandra_job.sh${NC}"
 
-# 7. Start Python API Fetcher
+# 7. Setup ML predictions (optional)
+echo -e "\n${YELLOW}[7/7] Setting up ML predictions...${NC}"
+
+# Setup PostgreSQL predictions table
+if sudo docker exec postgres psql -U postgres -d air_quality -c "\d aqi_predictions" > /dev/null 2>&1; then
+    echo -e "${GREEN}✓ ML predictions table exists${NC}"
+else
+    echo -e "${YELLOW}Creating predictions table...${NC}"
+    ./setup_postgres_predictions.sh
+fi
+
+echo -e "\n${YELLOW}ML Predictions:${NC}"
+echo -e "  Run manually: ${GREEN}./run_ml_predictions.sh${NC}"
+echo -e "  Or schedule hourly with: ${GREEN}./schedule_ml_predictions.sh${NC}"
+
+# 8. Start Python API Fetcher
 echo -e "\n${YELLOW}[7/7] Starting Python API fetcher...${NC}"
 cd "$PROJECT_DIR"
 if ! check_service "$PYTHON_SCRIPT" "Python API fetcher"; then
