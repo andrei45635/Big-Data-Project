@@ -38,20 +38,21 @@ echo -e "${GREEN}✓ Found $RECORD_COUNT hourly records${NC}"
 echo -e "\n${YELLOW}Preparing ML environment...${NC}"
 sudo docker exec spark-master mkdir -p /opt/spark-apps/ml_model
 
+# Install Python dependencies
+echo -e "${YELLOW}Installing dependencies...${NC}"
+sudo docker exec -u root spark-master pip install pandas numpy==1.24.3 scikit-learn joblib tensorflow
+
 # Copy your ML model script
 if [ -f "hadoop-cluster/spark-apps/ml_model/predict_aqi.py" ]; then
     sudo docker cp hadoop-cluster/spark-apps/ml_model/predict_aqi.py spark-master:/opt/spark-apps/ml_model/
-    sudo docker cp hadoop-cluster/spark-apps/ml_model/aqi_model_lstm.keras spark-master:/opt/spark-apps/ml_model/
-    sudo docker cp hadoop-cluster/spark-apps/ml_model/scaler.save spark-master:/opt/spark-apps/ml_model/
+    sudo docker cp AQD.csv spark-master:/opt/spark-apps/ml_model/
+    sudo docker cp train_aqi_lstm.py spark-master:/opt/spark-apps/ml_model/
+    sudo docker exec -it spark-master python3 /opt/spark-apps/ml_model/train_aqi_lstm.py /opt/spark-apps/ml_model/AQD.csv
     echo -e "${GREEN}✓ ML script copied${NC}"
 else
     echo -e "${RED}✗ ML script not found at ml_model/predict_aqi.py${NC}"
     exit 1
 fi
-
-# Install Python dependencies
-echo -e "${YELLOW}Installing dependencies...${NC}"
-sudo docker exec -u root spark-master pip install pandas numpy scikit-learn joblib tensorflow==2.20.0 --quiet 2>/dev/null
 
 # Run the Spark job
 echo -e "\n${YELLOW}Running Spark ML job...${NC}"

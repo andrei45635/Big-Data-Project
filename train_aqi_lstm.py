@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import joblib
+import sys
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.model_selection import train_test_split
 from tensorflow.keras.models import Sequential
@@ -10,7 +11,7 @@ from tensorflow.keras.callbacks import EarlyStopping
 # -------------------
 # CONFIG
 # -------------------
-CSV_PATH = "AQD.csv"
+CSV_PATH = sys.argv[1]
 TIME_WINDOW = 24        # past hours used for prediction
 FORECAST_HORIZON = 6    # hours into the future
 BATCH_SIZE = 32
@@ -132,4 +133,4 @@ print(f"Predicted future AQI for city {city}:")
 print(future_aqi)
 
 model.save("aqi_model_lstm.keras")
-joblib.dump(scaler, "hadoop-cluster/spark-apps/ml_model/scaler.save")
+joblib.dump(scaler, "scaler.save")
