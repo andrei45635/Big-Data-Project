@@ -132,5 +132,5 @@ future_aqi = predict_future(model, recent_window, scaler, target_index)
 print(f"Predicted future AQI for city {city}:")
 print(future_aqi)
 
-model.save("aqi_model_lstm.keras")
+model.save("aqi_model_lstm_dir", save_format="tf")
 joblib.dump(scaler, "scaler.save")
