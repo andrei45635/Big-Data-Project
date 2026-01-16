@@ -9,11 +9,9 @@ spark = SparkSession.builder \
 
 spark.sparkContext.setLogLevel("WARN")
 
-# Read all Parquet files from HDFS
 print("Reading data from HDFS...")
 df = spark.read.parquet("hdfs://namenode:9000/air-quality/historical/")
 
-# Flatten and prepare data
 flattened_df = df.select(
     col("fetch_timestamp"),
     col("city_name"),
@@ -38,7 +36,6 @@ flattened_df = df.select(
     col("iaqi.w.v").alias("wind_speed")
 )
 
-# Convert timestamp string to proper timestamp
 final_df = flattened_df.withColumn(
     "timestamp",
     to_timestamp(col("fetch_timestamp"))
@@ -46,7 +43,6 @@ final_df = flattened_df.withColumn(
 
 print(f"Found {final_df.count()} records to write")
 
-# Database connection properties
 jdbc_url = "jdbc:postgresql://postgres:5432/air_quality"
 connection_properties = {
     "user": "postgres",
@@ -54,7 +50,6 @@ connection_properties = {
     "driver": "org.postgresql.Driver"
 }
 
-# Write to PostgreSQL (overwrite mode to replace all data)
 print("Writing to PostgreSQL...")
 final_df.write \
     .jdbc(
@@ -66,7 +61,6 @@ final_df.write \
 
 print("Successfully wrote data to PostgreSQL!")
 
-# Show summary
 print("\nData summary:")
 final_df.groupBy("city_name").count().show()
 

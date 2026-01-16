@@ -17,7 +17,6 @@ spark = SparkSession.builder \
 
 spark.sparkContext.setLogLevel("WARN")
 
-# Schema for incoming data
 schema = StructType([
     StructField("fetch_timestamp", StringType()),
     StructField("city_name", StringType()),
@@ -33,7 +32,6 @@ schema = StructType([
     ]))),
 ])
 
-# Read from Kafka
 df = spark \
     .readStream \
     .format("kafka") \
@@ -43,18 +41,15 @@ df = spark \
     .option("failOnDataLoss", "false") \
     .load()
 
-# Parse JSON
 parsed_df = df.select(
     from_json(col("value").cast("string"), schema).alias("data")
 ).select("data.*")
 
-# Add proper timestamp
 timestamped_df = parsed_df.withColumn(
     "timestamp",
     to_timestamp(col("fetch_timestamp"))
 )
 
-# Flatten for processing
 flattened_df = timestamped_df.select(
     col("timestamp"),
     col("city_name"),
@@ -66,7 +61,6 @@ flattened_df = timestamped_df.select(
     col("iaqi.h.v").alias("humidity")
 )
 
-# === SPEED LAYER 1: Latest Readings ===
 def write_latest_to_cassandra(batch_df, batch_id):
     batch_df.write \
         .format("org.apache.spark.sql.cassandra") \
@@ -82,7 +76,6 @@ latest_query = flattened_df \
     .option("checkpointLocation", "hdfs://namenode:9000/checkpoints/cassandra-latest") \
     .start()
 
-# === SPEED LAYER 2: Hourly Time Windows ===
 windowed_df = flattened_df \
     .withWatermark("timestamp", "10 minutes") \
     .groupBy(
@@ -128,5 +121,4 @@ windowed_query = windowed_df \
     .option("checkpointLocation", "hdfs://namenode:9000/checkpoints/cassandra-windows") \
     .start()
 
-# Wait for both queries
 spark.streams.awaitAnyTermination()

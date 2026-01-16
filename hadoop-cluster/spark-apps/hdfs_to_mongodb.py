@@ -10,11 +10,9 @@ spark = SparkSession.builder \
 
 spark.sparkContext.setLogLevel("WARN")
 
-# Read all Parquet files from HDFS
 print("Reading data from HDFS...")
 df = spark.read.parquet("hdfs://namenode:9000/air-quality/historical/")
 
-# Flatten nested structures
 flattened_df = df.select(
     col("fetch_timestamp"),
     col("city_name"),
@@ -39,18 +37,15 @@ flattened_df = df.select(
     col("iaqi.w.v").alias("wind_speed")
 )
 
-# Convert to list of dictionaries
 print("Converting to Python objects...")
 records = [row.asDict() for row in flattened_df.collect()]
 print(f"Found {len(records)} records")
 
-# Connect to MongoDB and insert
 print("Connecting to MongoDB...")
 client = MongoClient("mongodb://mongodb:27017/")
 db = client["air_quality"]
 collection = db["measurements"]
 
-# Clear old data and insert new
 print("Clearing old data...")
 collection.delete_many({})
 
@@ -61,21 +56,17 @@ if records:
 else:
     print("No records to insert")
 
-# Create indexes for better query performance
 print("Creating indexes...")
 collection.create_index([("fetch_timestamp", -1)])
 collection.create_index([("city_name", 1)])
 collection.create_index([("aqi", 1)])
 
-# Print sample
 print("\nSample record:")
 sample = collection.find_one()
 if sample:
-    # Remove _id for cleaner output
     sample.pop('_id', None)
     print(json.dumps(sample, indent=2, default=str))
 
-# Show stats
 print(f"\nTotal documents: {collection.count_documents({})}")
 print("Documents by city:")
 for doc in collection.aggregate([
