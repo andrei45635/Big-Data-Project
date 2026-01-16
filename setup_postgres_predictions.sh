@@ -14,7 +14,7 @@ if ! sudo docker ps | grep -q postgres; then
 fi
 
 # Create predictions table
-sudo docker exec postgres psql -U postgres -d air_quality << 'EOF'
+sudo docker exec -i postgres psql -U postgres -d air_quality << 'EOF'
 -- Create predictions table
 CREATE TABLE IF NOT EXISTS aqi_predictions (
     id SERIAL PRIMARY KEY,
