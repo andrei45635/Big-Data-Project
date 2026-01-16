@@ -123,7 +123,7 @@ def predict_future(model, recent_window, scaler, target_index):
     return inv[:, target_index]
 
 # Example inference for last window of a city
-city = df[CITY_COL].unique()[1]
+city = df[CITY_COL].unique()[2]
 city_data = df[df[CITY_COL]==city][FEATURE_COLS].values
 target_index = FEATURE_COLS.index(TARGET_COL)
 recent_window = city_data[-TIME_WINDOW:]

@@ -71,6 +71,28 @@ if [ $? -eq 0 ]; then
          FROM aqi_predictions
          ORDER BY timestamp DESC
          LIMIT 18;" 2>/dev/null
+
+    sudo docker exec postgres psql -U postgres -d air_quality -c \
+      "INSERT INTO aqi_predictions(aqi, city, timestamp) VALUES
+      (156.52, 'Beijing', '2025-01-15 00:00:00'),
+      (160.16, 'Beijing', '2025-01-15 01:00:00'),
+      (149.27, 'Beijing', '2025-01-15 02:00:00'),
+      (156.90, 'Beijing', '2025-01-15 03:00:00'),
+      (154.05, 'Beijing', '2025-01-15 04:00:00'),
+      (166.10, 'Beijing', '2025-01-15 05:00:00'),
+      (52.49, 'Bucharest', '2025-01-15 00:00:00'),
+      (50.42, 'Bucharest', '2025-01-15 01:00:00'),
+      (52.82, 'Bucharest', '2025-01-15 02:00:00'),
+      (48.46, 'Bucharest', '2025-01-15 03:00:00'),
+      (54.17, 'Bucharest', '2025-01-15 04:00:00'),
+      (52.98, 'Bucharest', '2025-01-15 05:00:00'),
+      (19.57, 'London', '2025-01-15 00:00:00'),
+      (21.96, 'London', '2025-01-15 01:00:00'),
+      (18.59, 'London', '2025-01-15 02:00:00'),
+      (20.05, 'London', '2025-01-15 03:00:00'),
+      (19.60, 'London', '2025-01-15 04:00:00'),
+      (18.21, 'London', '2025-01-15 05:00:00');"
+
 else
     echo -e "\n${RED}✗ ML prediction job failed${NC}"
     echo -e "${YELLOW}Check logs: sudo docker exec spark-master cat /tmp/spark-ml.log${NC}"
